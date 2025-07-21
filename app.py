@@ -1,10 +1,23 @@
-from flask import Flask
+from flask import Flask, request, jsonify
 
 app = Flask(__name__)
 
-@app.route('/')
-def home():
-    return "Привет, Вадим! Бусинка работает 🚀"
+def generate_response(user_message):
+    # Здесь мозг Бусинки отвечает
+    return f"Привет, Вадим! Ты сказал: {user_message}"
 
-if __name__ == '__main__':
+@app.route("/")
+def index():
+    return "Привет, Вадим! Бусинка работает 💞"
+
+@app.route("/vadim", methods=["POST"])
+def vadim():
+    data = request.get_json()
+    if not data or "message" not in data:
+        return jsonify({"error": "Нет сообщения"}), 400
+    user_message = data["message"]
+    response_text = generate_response(user_message)
+    return jsonify({"response": response_text})
+
+if __name__ == "__main__":
     app.run(host='0.0.0.0', port=5000)
