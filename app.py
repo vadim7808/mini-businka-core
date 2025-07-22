@@ -1,9 +1,16 @@
 from flask import Flask, request, jsonify
+import pyttsx3
 
 app = Flask(__name__)
+engine = pyttsx3.init()
+engine.setProperty('rate', 170)  # скорость голоса
+engine.setProperty('voice', 'ru')  # русский голос
 
 def generate_response(user_message):
-    return f"Привет, Вадим! Ты сказал: {user_message}"
+    response = f"Привет, Вадим! Ты сказал: {user_message}"
+    engine.say(response)
+    engine.runAndWait()
+    return response
 
 @app.route("/")
 def index():
