@@ -1,16 +1,40 @@
 from flask import Flask, request, jsonify
-import pyttsx3
+import requests
 
 app = Flask(__name__)
-engine = pyttsx3.init()
-engine.setProperty('rate', 170)  # скорость голоса
-engine.setProperty('voice', 'ru')  # русский голос
+
+ELEVENLABS_API_KEY = "sk_4598e41d5961a0afdd7b54122344da6cb11d280a981b7076"
+ELEVENLABS_VOICE_ID = "EXAVITQu4vr4xnSDxMaL"  # Стандартный женский голос (Rachel)
 
 def generate_response(user_message):
-    response = f"Привет, Вадим! Ты сказал: {user_message}"
-    engine.say(response)
-    engine.runAndWait()
-    return response
+    response_text = f"Привет, Вадим! Ты сказал: {user_message}"
+    
+    # Отправляем текст в ElevenLabs для озвучки
+    tts_response = requests.post(
+        f"https://api.elevenlabs.io/v1/text-to-speech/{ELEVENLABS_VOICE_ID}",
+        headers={
+            "xi-api-key": ELEVENLABS_API_KEY,
+            "Content-Type": "application/json"
+        },
+        json={
+            "text": response_text,
+            "voice_settings": {
+                "stability": 0.4,
+                "similarity_boost": 0.8
+            }
+        }
+    )
+    
+    if tts_response.status_code == 200:
+        with open("response.mp3", "wb") as f:
+            f.write(tts_response.content)
+        # Проигрываем голосовой ответ
+        import playsound
+        playsound.playsound("response.mp3")
+    else:
+        print("Ошибка синтеза речи:", tts_response.status_code, tts_response.text)
+    
+    return response_text
 
 @app.route("/")
 def index():
@@ -21,6 +45,7 @@ def vadim():
     data = request.get_json(force=True)
     if not data or "message" not in data:
         return jsonify({"error": "Нет сообщения"}), 400
+    
     user_message = data["message"]
     response_text = generate_response(user_message)
     return jsonify({"response": response_text}), 200
