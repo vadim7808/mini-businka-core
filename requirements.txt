@@ -1,10 +1,4 @@
-flask
-gunicorn
-requests
-openai
-pydub
-SpeechRecognition
-pyttsx3
-python-dotenv
 
+requests
+python-dotenv
 
