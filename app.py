@@ -1,42 +1,66 @@
-from flask import Flask, request, jsonify
-import requests
 import os
+from flask import Flask, request, jsonify
+import openai
+import requests
 
 app = Flask(__name__)
 
-# Замените своими ключами, если используете переменные среды
+# Получение API-ключей из переменных окружения
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 ELEVENLABS_API_KEY = os.getenv("ELEVENLABS_API_KEY")
 ELEVENLABS_VOICE_ID = os.getenv("ELEVENLABS_VOICE_ID")
 
-@app.route("/generate", methods=["POST"])
-def generate_response():
+# Настройка OpenAI
+openai.api_key = OPENAI_API_KEY
+
+@app.route("/", methods=["GET"])
+def index():
+    return "🟢 Businka Voice API is running."
+
+@app.route("/ask", methods=["POST"])
+def ask():
     try:
-        data = request.json
-        response_text = data.get("text", "")
+        user_input = request.json.get("question", "")
+        if not user_input:
+            return jsonify({"error": "Missing question"}), 400
 
-        # Запрос к ElevenLabs
-        tts_response = requests.post(
-            f"https://api.elevenlabs.io/v1/text-to-speech/{ELEVENLABS_VOICE_ID}",
-            headers={
-                "xi-api-key": ELEVENLABS_API_KEY,
-                "Content-Type": "application/json"
-            },
-            json={
-                "text": response_text,
-                "voice_settings": {
-                    "stability": 0.5,
-                    "similarity_boost": 0.75
-                }
-            }
+        # Получение ответа от ChatGPT
+        gpt_response = openai.ChatCompletion.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {"role": "system", "content": "Ты голосовой ассистент по имени Бусинка."},
+                {"role": "user", "content": user_input}
+            ]
         )
+        text = gpt_response.choices[0].message["content"]
 
-        if tts_response.status_code == 200:
-            print("✅ Voice generated successfully.")
-            return tts_response.content, 200, {'Content-Type': 'audio/mpeg'}
-        else:
-            print(f"❌ ElevenLabs error: {tts_response.status_code} {tts_response.text}")
-            return jsonify({"error": "Voice synthesis failed"}), 500
+        # Синтез речи через ElevenLabs
+        voice_url = f"https://api.elevenlabs.io/v1/text-to-speech/{ELEVENLABS_VOICE_ID}"
+        headers = {
+            "xi-api-key": ELEVENLABS_API_KEY,
+            "Content-Type": "application/json"
+        }
+        payload = {
+            "text": text,
+            "model_id": "eleven_monolingual_v1",
+            "voice_settings": {
+                "stability": 0.5,
+                "similarity_boost": 0.7
+            }
+        }
+        tts_response = requests.post(voice_url, headers=headers, json=payload)
+
+        if tts_response.status_code != 200:
+            return jsonify({"error": "Failed to generate voice", "details": tts_response.text}), 500
+
+        audio_data = tts_response.content
+        return audio_data, 200, {
+            "Content-Type": "audio/mpeg"
+        }
 
     except Exception as e:
-        print(f"❌ Speech synthesis error: {e}")
-        return jsonify({"error": "Speech synthesis error"}), 500
+        return jsonify({"error": str(e)}), 500
+
+if __name__ == "__main__":
+    app.run(debug=False, host="0.0.0.0", port=10000)
+Update app.py for Businka
