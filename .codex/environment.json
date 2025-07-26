@@ -1,0 +1,7 @@
+{
+  "repo": "vadim7808/mini-businka-core",
+  "internet_access": true,
+  "allowed_domains": ["pypi.org", "files.pythonhosted.org"],
+  "http_methods": ["GET", "POST", "HEAD", "OPTIONS", "PUT", "DELETE", "PATCH"],
+  "allow_all_domains": false
+}
