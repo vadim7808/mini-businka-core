@@ -1,44 +1,38 @@
-import os
+from flask import Flask, request, jsonify, Response
+import openai
 import requests
-from flask import Flask, request, jsonify
+import os
 
 app = Flask(__name__)
+
+# Конфигурация
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "your-openai-key")
+ELEVENLABS_API_KEY = os.getenv("ELEVENLABS_API_KEY", "your-elevenlabs-key")
+ELEVENLABS_VOICE_ID = os.getenv("ELEVENLABS_VOICE_ID", "your-voice-id")
+
+openai.api_key = OPENAI_API_KEY
+
+@app.route("/")
+def index():
+    return "Hello from Businka!"
 
 @app.route("/ask", methods=["POST"])
 def ask():
     try:
-        user_input = request.json.get("prompt")
-        if not user_input:
-            return jsonify({"error": "Missing prompt"}), 400
+        user_message = request.json.get("message", "")
+        if not user_message:
+            return jsonify({"error": "No message provided"}), 400
 
-        # Получаем API-ключи из переменных окружения
-        openai_api_key = os.getenv("OPENAI_API_KEY")
-        voice_id = os.getenv("ELEVENLABS_VOICE_ID")
-        elevenlabs_api_key = os.getenv("ELEVENLABS_API_KEY")
-
-        if not openai_api_key or not voice_id or not elevenlabs_api_key:
-            return jsonify({"error": "Missing API keys"}), 500
-
-        # Отправка запроса в OpenAI
-        response = requests.post(
-            "https://api.openai.com/v1/chat/completions",
-            headers={
-                "Authorization": f"Bearer {openai_api_key}",
-                "Content-Type": "application/json"
-            },
-            json={
-                "model": "gpt-3.5-turbo",
-                "messages": [{"role": "user", "content": user_input}]
-            }
+        gpt_response = openai.ChatCompletion.create(
+            model="gpt-3.5-turbo",
+            messages=[{"role": "user", "content": user_message}]
         )
+        text = gpt_response.choices[0].message["content"]
 
-        gpt_response = response.json()
-        text = gpt_response["choices"][0]["message"]["content"]
-
-        # Синтез речи через ElevenLabs
-        voice_url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
+        # ElevenLabs TTS
+        voice_url = f"https://api.elevenlabs.io/v1/text-to-speech/{ELEVENLABS_VOICE_ID}"
         headers = {
-            "xi-api-key": elevenlabs_api_key,
+            "xi-api-key": ELEVENLABS_API_KEY,
             "Content-Type": "application/json"
         }
         payload = {
@@ -52,12 +46,10 @@ def ask():
 
         tts_response = requests.post(voice_url, headers=headers, json=payload)
         if tts_response.status_code != 200:
-            return jsonify({"error": "Failed to generate voice", "details": tts_response.text}), 500
+            return jsonify({"error": "TTS failed", "details": tts_response.text}), 500
 
         audio_data = tts_response.content
-        return audio_data, 200, {
-            "Content-Type": "audio/mpeg"
-        }
+        return Response(audio_data, mimetype="audio/mpeg")
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
