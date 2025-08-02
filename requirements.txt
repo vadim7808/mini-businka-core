@@ -3,8 +3,8 @@ requests
 pyttsx3
 flask
 websockets
-
 gtts
 pydub
 aiofiles
-pyaudio
+
+
