@@ -3,7 +3,7 @@ requests
 pyttsx3
 flask
 websockets
-speechrecognition
+
 gtts
 pydub
 aiofiles
