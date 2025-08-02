@@ -7,3 +7,4 @@ speechrecognition
 gtts
 pydub
 aiofiles
+pyaudio
