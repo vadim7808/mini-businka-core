@@ -6,5 +6,7 @@ websockets
 gtts
 pydub
 aiofiles
+fastapi
+uvicorn[standard]
 
 
