@@ -1,101 +1,82 @@
-# app.py
 from flask import Flask, request, jsonify
-from dotenv import load_dotenv
 import os
 import google.generativeai as genai
-import json
+from dotenv import load_dotenv
 from flask_cors import CORS
 
-# Загрузка переменных окружения из файла .env
+# Load environment variables from .env file
 load_dotenv()
+genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 
-# Инициализация Flask и CORS
 app = Flask(__name__)
-CORS(app)  # Разрешает твоему локальному клиенту подключаться к серверу
+CORS(app)
 
-# Настройка Gemini API
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-if not GEMINI_API_KEY:
-    raise ValueError("Переменная окружения GEMINI_API_KEY не установлена в файле .env")
-
-genai.configure(api_key=GEMINI_API_KEY)
-model = genai.GenerativeModel("gemini-pro")
-
-@app.route("/")
-def home():
-    """Простой маршрут для проверки работы сервера."""
-    return "Сервер голосового ассистента на базе Gemini работает."
+# Убедитесь, что модель инициализирована правильно
+model = genai.GenerativeModel('gemini-pro')
 
 @app.route("/process", methods=["POST"])
 def process():
-    """Основная точка входа для получения команд и генерации действий."""
     try:
         data = request.get_json()
         user_text = data.get("text", "")
         window_info = data.get("window_info", {})
 
+        # Проверьте, что текст не пустой
         if not user_text:
-            return jsonify({"error": "Нет текста от пользователя"}), 400
+            return jsonify({"actions": [{"type": "speak", "text": "Я вас не расслышал, пожалуйста, повторите"}]})
 
-        # Составление промта для Gemini с командой пользователя и контекстом системы
+        # Создайте промпт для Gemini
         prompt = f"""
-        Ты — голосовой ассистент, управляющий компьютером. Твоя задача — анализировать команды пользователя,
-        учитывать контекст открытых окон и формировать список действий для выполнения на ПК.
-        Твой ответ должен быть строго в формате JSON, содержащий список объектов с действиями.
+        Ты — голосовой ассистент, который управляет компьютером. Твоя цель — понять команду пользователя и сгенерировать список действий в формате JSON.
+        Ответ должен быть только в формате JSON, без лишнего текста.
 
-        Доступные типы действий:
-        - "speak": {{"type": "speak", "text": "Текст для озвучивания"}}
-        - "move_mouse": {{"type": "move_mouse", "x": 100, "y": 200, "duration": 0.5}}
-        - "click": {{"type": "click"}}
-        - "double_click": {{"type": "double_click"}}
-        - "type_text": {{"type": "type_text", "text": "Текст для ввода"}}
-        - "hotkey": {{"type": "hotkey", "keys": ["ctrl", "c"]}}
-        - "open_app": {{"type": "open_app", "name": "chrome"}}
-        - "delay": {{"type": "delay", "delay": 1.5}}
+        Пользователь сказал: "{user_text}"
 
-        Текущий контекст:
+        Контекст:
         - Активное окно: {window_info.get('active_window')}
-        - Все открытые окна: {', '.join(window_info.get('all_windows', []))}
 
-        Команда пользователя: "{user_text}"
+        Действия, которые ты можешь использовать:
+        1. speak: Озвучить текст. Пример: {{"type": "speak", "text": "Привет, чем могу помочь?"}}
+        2. move_mouse: Переместить курсор мыши. Пример: {{"type": "move_mouse", "x": 500, "y": 300, "duration": 1.0}}
+        3. click: Кликнуть левой кнопкой мыши. Пример: {{"type": "click"}}
+        4. double_click: Сделать двойной клик. Пример: {{"type": "double_click"}}
+        5. type_text: Ввести текст с клавиатуры. Пример: {{"type": "type_text", "text": "Привет мир!", "interval": 0.1}}
+        6. hotkey: Нажать комбинацию клавиш. Пример: {{"type": "hotkey", "keys": ["ctrl", "c"]}}
+        7. open_app: Открыть программу. Пример: {{"type": "open_app", "name": "notepad"}}
 
-        Примеры ответов:
-        1. Если пользователь говорит "Открой браузер":
+        Оцени команду пользователя и верни JSON со списком подходящих действий. Если пользователь просто задает вопрос, верни действие "speak" с ответом.
+        Если ты не можешь выполнить команду, ответь "speak" с объяснением.
+
+        Твой JSON-ответ должен выглядеть так:
         {{
             "actions": [
-                {{"type": "speak", "text": "Открываю браузер."}},
-                {{"type": "open_app", "name": "chrome"}}
-            ]
-        }}
-        2. Если пользователь говорит "Привет":
-        {{
-            "actions": [
-                {{"type": "speak", "text": "Здравствуйте, чем могу помочь?"}}
+                {{"type": "speak", "text": "Команда выполнена."}},
+                {{"type": "open_app", "name": "notepad"}}
             ]
         }}
 
-        Пожалуйста, сформируй список действий для выполнения, основываясь на команде пользователя и контексте.
-        Отвечай только JSON-объектом, без лишнего текста.
+        Верни только JSON.
         """
-        
+
+        # Получение ответа от Gemini
         response = model.generate_content(prompt)
         reply = response.text.strip()
-        
+        print(f"Ответ от Gemini: {reply}") # Для отладки
+
+        # Попытка распарсить JSON
         try:
-            # Попытка разобрать JSON-ответ от Gemini
-            actions_json = json.loads(reply)
-            return jsonify(actions_json)
+            actions_data = json.loads(reply)
+            return jsonify(actions_data)
         except json.JSONDecodeError:
-            # Если Gemini ответил не валидным JSON, мы обрабатываем это как обычный текст
-            return jsonify({
-                "actions": [
-                    {"type": "speak", "text": reply}
-                ]
-            })
+            return jsonify({"error": "Неверный формат JSON от Gemini", "raw_response": reply}), 500
 
     except Exception as e:
-        print(f"Ошибка при обработке запроса: {e}")
-        return jsonify({"actions": [{"type": "speak", "text": "Извините, произошла ошибка."}]}), 500
+        print(f"Произошла ошибка: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/")
+def home():
+    return "Сервер голосового ассистента работает."
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=5000)
