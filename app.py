@@ -5,6 +5,7 @@ from dotenv import load_dotenv
 from flask_cors import CORS
 import json
 
+# Загрузка переменных окружения
 load_dotenv()
 genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 
@@ -20,52 +21,52 @@ def process():
         user_text = data.get("text", "")
         window_info = data.get("window_info", {})
 
-        # Убедимся, что window_info — это словарь
-        if not isinstance(window_info, dict):
-            window_info = {}
-
         if not user_text:
-            return jsonify({"actions": [{"type": "speak", "text": "Я вас не расслышал, пожалуйста, повторите"}]})
+            return jsonify({
+                "actions": [
+                    {"type": "speak", "text": "Я вас не расслышал, пожалуйста, повторите"}
+                ]
+            })
 
         prompt = f"""
-        Ты — голосовой ассистент, управляющий компьютером. Понимай команду пользователя и возвращай действия в формате JSON.
+        Ты — голосовой ассистент, управляющий компьютером. Пользователь сказал: "{user_text}".
+        Контекст: активное окно — {window_info.get('active_window', 'неизвестно')}.
 
-        Пользователь сказал: "{user_text}"
+        Доступные действия:
+        - speak: {{ "type": "speak", "text": "..." }}
+        - move_mouse: {{ "type": "move_mouse", "x": ..., "y": ..., "duration": ... }}
+        - click: {{ "type": "click" }}
+        - double_click: {{ "type": "double_click" }}
+        - type_text: {{ "type": "type_text", "text": "...", "interval": ... }}
+        - hotkey: {{ "type": "hotkey", "keys": ["ctrl", "c"] }}
+        - open_app: {{ "type": "open_app", "name": "notepad" }}
 
-        Контекст:
-        - Активное окно: {window_info.get('active_window', '')}
-
-        Поддерживаемые действия:
-        1. speak — Пример: {{"type": "speak", "text": "Привет!"}}
-        2. move_mouse — Пример: {{"type": "move_mouse", "x": 500, "y": 300, "duration": 1.0}}
-        3. click — Пример: {{"type": "click"}}
-        4. double_click — Пример: {{"type": "double_click"}}
-        5. type_text — Пример: {{"type": "type_text", "text": "Привет", "interval": 0.1}}
-        6. hotkey — Пример: {{"type": "hotkey", "keys": ["ctrl", "c"]}}
-        7. open_app — Пример: {{"type": "open_app", "name": "notepad"}}
-
-        Возвращай только JSON, например:
+        Ответ должен быть в виде JSON:
         {{
             "actions": [
-                {{"type": "speak", "text": "Команда выполнена."}},
-                {{"type": "open_app", "name": "notepad"}}
+                {{ "type": "speak", "text": "..." }},
+                ...
             ]
         }}
+
+        Если ты не можешь выполнить команду, скажи об этом через speak.
+        Ответ — только JSON, без текста вокруг.
         """
 
+        # Получение ответа от Gemini
         response = model.generate_content(prompt)
-        reply = response.text.strip()
-
-        print(f"Ответ от Gemini: {reply}")
+        raw_reply = response.text if hasattr(response, "text") else "".join([p.text for p in response.parts])
+        print(f"Ответ от Gemini: {raw_reply}")
 
         try:
-            actions_data = json.loads(reply)
+            actions_data = json.loads(raw_reply)
             return jsonify(actions_data)
-        except json.JSONDecodeError:
-            return jsonify({"error": "Неверный формат JSON от Gemini", "raw_response": reply}), 500
+        except json.JSONDecodeError as e:
+            print(f"Ошибка JSON: {e}")
+            return jsonify({"error": "Ошибка при разборе JSON", "raw_response": raw_reply}), 500
 
     except Exception as e:
-        print(f"Произошла ошибка: {e}")
+        print(f"Внутренняя ошибка сервера: {e}")
         return jsonify({"error": str(e)}), 500
 
 @app.route("/")
