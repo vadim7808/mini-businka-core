@@ -5,15 +5,16 @@ from dotenv import load_dotenv
 from flask_cors import CORS
 import json
 
-# Load environment variables from .env file
+# Загрузка переменных окружения из файла .env
 load_dotenv()
 genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 
 app = Flask(__name__)
 CORS(app)
 
-# Имя модели изменено на gemini-1.0-pro, чтобы избежать ошибки "404 Not Found"
-model = genai.GenerativeModel('gemini-1.0-pro')
+# Имя модели изменено на gemini-1.5-flash, чтобы избежать ошибки "404 Not Found"
+# Эта модель более новая и надежная.
+model = genai.GenerativeModel('gemini-1.5-flash')
 
 @app.route("/process", methods=["POST"])
 def process():
