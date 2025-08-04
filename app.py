@@ -21,6 +21,10 @@ def process():
         data = request.get_json()
         user_text = data.get("text", "")
         window_info = data.get("window_info", {})
+        
+        # Проверка, что window_info не является None
+        if not window_info:
+            window_info = {}
 
         # Проверьте, что текст не пустой
         if not user_text:
