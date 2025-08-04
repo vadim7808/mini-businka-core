@@ -4,7 +4,6 @@ import google.generativeai as genai
 from dotenv import load_dotenv
 from flask_cors import CORS
 import json
-import re
 
 load_dotenv()
 genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
@@ -21,41 +20,49 @@ def process():
         user_text = data.get("text", "")
         window_info = data.get("window_info", {})
 
+        # Убедимся, что window_info — это словарь
+        if not isinstance(window_info, dict):
+            window_info = {}
+
         if not user_text:
             return jsonify({"actions": [{"type": "speak", "text": "Я вас не расслышал, пожалуйста, повторите"}]})
 
         prompt = f"""
-        Ты — голосовой ассистент, который управляет компьютером. Твоя цель — понять команду пользователя и сгенерировать список действий в формате JSON.
-        Ответ должен быть только в формате JSON, без лишнего текста.
+        Ты — голосовой ассистент, управляющий компьютером. Понимай команду пользователя и возвращай действия в формате JSON.
 
         Пользователь сказал: "{user_text}"
 
         Контекст:
-        - Активное окно: {window_info.get('active_window')}
+        - Активное окно: {window_info.get('active_window', '')}
 
-        Действия, которые ты можешь использовать:
-        1. speak: Озвучить текст. Пример: {{"type": "speak", "text": "Привет, чем могу помочь?"}}
-        2. move_mouse: Переместить курсор мыши. Пример: {{"type": "move_mouse", "x": 500, "y": 300, "duration": 1.0}}
-        3. click: Кликнуть левой кнопкой мыши. Пример: {{"type": "click"}}
-        4. double_click: Сделать двойной клик. Пример: {{"type": "double_click"}}
-        5. type_text: Ввести текст. Пример: {{"type": "type_text", "text": "Привет мир!", "interval": 0.1}}
-        6. hotkey: Комбинация клавиш. Пример: {{"type": "hotkey", "keys": ["ctrl", "c"]}}
-        7. open_app: Открыть программу. Пример: {{"type": "open_app", "name": "notepad"}}
+        Поддерживаемые действия:
+        1. speak — Пример: {{"type": "speak", "text": "Привет!"}}
+        2. move_mouse — Пример: {{"type": "move_mouse", "x": 500, "y": 300, "duration": 1.0}}
+        3. click — Пример: {{"type": "click"}}
+        4. double_click — Пример: {{"type": "double_click"}}
+        5. type_text — Пример: {{"type": "type_text", "text": "Привет", "interval": 0.1}}
+        6. hotkey — Пример: {{"type": "hotkey", "keys": ["ctrl", "c"]}}
+        7. open_app — Пример: {{"type": "open_app", "name": "notepad"}}
 
-        Верни только JSON, без форматирования Markdown.
+        Возвращай только JSON, например:
+        {{
+            "actions": [
+                {{"type": "speak", "text": "Команда выполнена."}},
+                {{"type": "open_app", "name": "notepad"}}
+            ]
+        }}
         """
 
         response = model.generate_content(prompt)
         reply = response.text.strip()
+
         print(f"Ответ от Gemini: {reply}")
 
-        # Удаляем обертку ```json ... ```
-        if reply.startswith("```json"):
-            reply = re.sub(r"^```json\s*|\s*```$", "", reply.strip(), flags=re.DOTALL)
-
-        # Парсим JSON
-        actions_data = json.loads(reply)
-        return jsonify(actions_data)
+        try:
+            actions_data = json.loads(reply)
+            return jsonify(actions_data)
+        except json.JSONDecodeError:
+            return jsonify({"error": "Неверный формат JSON от Gemini", "raw_response": reply}), 500
 
     except Exception as e:
         print(f"Произошла ошибка: {e}")
