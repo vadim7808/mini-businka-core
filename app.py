@@ -3,6 +3,7 @@ import os
 import google.generativeai as genai
 from dotenv import load_dotenv
 from flask_cors import CORS
+import json
 
 # Load environment variables from .env file
 load_dotenv()
@@ -29,12 +30,12 @@ def process():
         prompt = f"""
         Ты — голосовой ассистент, который управляет компьютером. Твоя цель — понять команду пользователя и сгенерировать список действий в формате JSON.
         Ответ должен быть только в формате JSON, без лишнего текста.
-
+        
         Пользователь сказал: "{user_text}"
-
+        
         Контекст:
         - Активное окно: {window_info.get('active_window')}
-
+        
         Действия, которые ты можешь использовать:
         1. speak: Озвучить текст. Пример: {{"type": "speak", "text": "Привет, чем могу помочь?"}}
         2. move_mouse: Переместить курсор мыши. Пример: {{"type": "move_mouse", "x": 500, "y": 300, "duration": 1.0}}
@@ -43,10 +44,10 @@ def process():
         5. type_text: Ввести текст с клавиатуры. Пример: {{"type": "type_text", "text": "Привет мир!", "interval": 0.1}}
         6. hotkey: Нажать комбинацию клавиш. Пример: {{"type": "hotkey", "keys": ["ctrl", "c"]}}
         7. open_app: Открыть программу. Пример: {{"type": "open_app", "name": "notepad"}}
-
+        
         Оцени команду пользователя и верни JSON со списком подходящих действий. Если пользователь просто задает вопрос, верни действие "speak" с ответом.
         Если ты не можешь выполнить команду, ответь "speak" с объяснением.
-
+        
         Твой JSON-ответ должен выглядеть так:
         {{
             "actions": [
@@ -54,7 +55,7 @@ def process():
                 {{"type": "open_app", "name": "notepad"}}
             ]
         }}
-
+        
         Верни только JSON.
         """
 
@@ -62,7 +63,7 @@ def process():
         response = model.generate_content(prompt)
         reply = response.text.strip()
         print(f"Ответ от Gemini: {reply}") # Для отладки
-
+        
         # Попытка распарсить JSON
         try:
             actions_data = json.loads(reply)
