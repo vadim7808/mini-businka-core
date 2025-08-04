@@ -12,8 +12,8 @@ genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 app = Flask(__name__)
 CORS(app)
 
-# Убедитесь, что модель инициализирована правильно
-model = genai.GenerativeModel('gemini-pro')
+# Имя модели изменено на gemini-1.0-pro, чтобы избежать ошибки "404 Not Found"
+model = genai.GenerativeModel('gemini-1.0-pro')
 
 @app.route("/process", methods=["POST"])
 def process():
